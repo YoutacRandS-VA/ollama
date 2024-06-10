@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"text/template"
 
@@ -55,5 +56,34 @@ func TestNamed(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestParse(t *testing.T) {
+	cases := []struct {
+		template     string
+		capabilities []string
+	}{
+		{"{{ .Prompt }}", []string{"prompt"}},
+		{"{{ .System }} {{ .Prompt }}", []string{"prompt", "system"}},
+		{"{{ .System }} {{ .Prompt }} {{ .Response }}", []string{"prompt", "response", "system"}},
+		{"{{ with .Tools }}{{ . }}{{ end }} {{ .System }} {{ .Prompt }}", []string{"prompt", "system", "tools"}},
+		{"{{ range .Messages }}{{ .Role }} {{ .Content }}{{ end }}", []string{"content", "messages", "role"}},
+		{"{{ range .Messages }}{{ if eq .Role \"system\" }}SYSTEM: {{ .Content }}{{ else if eq .Role \"user\" }}USER: {{ .Content }}{{ else if eq .Role \"assistant\" }}ASSISTANT: {{ .Content }}{{ end }}{{ end }}", []string{"content", "messages", "role"}},
+		{"{{ .Prompt }} {{ .Suffix }}", []string{"prompt", "suffix"}},
+	}
+
+	for _, tt := range cases {
+		t.Run("", func(t *testing.T) {
+			tmpl, err := Parse(tt.template)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			vars := tmpl.Vars()
+			if !slices.Equal(tt.capabilities, vars) {
+				t.Errorf("expected %v, got %v", tt.capabilities, vars)
+			}
+		})
 	}
 }
